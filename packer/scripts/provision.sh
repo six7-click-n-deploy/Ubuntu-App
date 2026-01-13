@@ -2,67 +2,29 @@
 set -euo pipefail
 
 # -----------------------------------------------------------------------------
-# TEMPLATE Provisioning Script
-# Ziel: Hier kommt *deine* App/Runtime rein.
-#
-# Regeln:
-# - idempotent schreiben (mehrfaches Ausführen darf nicht kaputt machen)
-# - keine Secrets hardcoden (nutze CI, Vault, cloud-init, env vars, etc.)
-# - am Ende: Service läuft / Artefakte liegen / Ports passen zur SG
+# Minimal Provisioning Script für Golden Ubuntu 22.04 Image
+# - Keine Applikationen, nur Basistools
+# - Idempotent, reproduzierbar, CI/CD-tauglich
 # -----------------------------------------------------------------------------
 
-echo "Waiting for cloud-init (if present)..."
+echo "Warte auf cloud-init (sofern vorhanden)..."
 cloud-init status --wait || true
 
-# Baseline (optional):
-# - Updates / Base-Pakete
-# - Logs/Debug
-echo "Updating package lists..."
+echo "System aktualisieren..."
 sudo apt-get update
+sudo DEBIAN_FRONTEND=noninteractive apt-get -y upgrade
 
-# -----------------------------------------------------------------------------
-# [1] Runtime installieren: minimaler Webserver (nginx)
-# -----------------------------------------------------------------------------
-echo "Installing nginx (if not already installed)..."
-sudo DEBIAN_FRONTEND=noninteractive apt-get install -y nginx
+echo "Installiere minimale Basis-Tools..."
+sudo apt-get install -y --no-install-recommends curl ca-certificates
 
-echo "Enabling and restarting nginx..."
-sudo systemctl enable nginx
-sudo systemctl restart nginx
+# Keine weiteren Applikationen oder Konfigurationen!
 
-# -----------------------------------------------------------------------------
-# [2] App-Artefakt: einfache HTML-Seite
-# -----------------------------------------------------------------------------
-echo "Deploying simple index.html..."
-sudo mkdir -p /var/www/html
+echo "Cleanup: apt-Cache & Listen entfernen..."
+sudo apt-get clean
+sudo rm -rf /var/lib/apt/lists/*
 
-sudo tee /var/www/html/index.html >/dev/null << 'EOF'
-<html>
-  <head>
-    <title>myapp2</title>
-  </head>
-  <body>
-    <h1>Hello from myapp2!</h1>
-    <p>Built with Packer & deployed with Terraform.</p>
-  </body>
-</html>
-EOF
+echo "Setze machine-id zurück..."
+sudo truncate -s 0 /etc/machine-id
+sudo rm -f /var/lib/dbus/machine-id || true
 
-# -----------------------------------------------------------------------------
-# [3] (Optional) eigener systemd-Service
-# - hier nicht nötig, nginx reicht als Webserver
-# -----------------------------------------------------------------------------
-# Beispiel bleibt auskommentiert
-
-# -----------------------------------------------------------------------------
-# [4] Optional: Reverse Proxy / TLS / Firewall
-# - für das Minimal-Beispiel nicht nötig
-# -----------------------------------------------------------------------------
-
-# -----------------------------------------------------------------------------
-# [5] Cleanup (optional, wenn du kleinere Images willst)
-# -----------------------------------------------------------------------------
-# sudo apt-get clean
-# sudo rm -rf /var/lib/apt/lists/*
-
-echo "Provisioning finished."
+echo "Provisioning abgeschlossen."

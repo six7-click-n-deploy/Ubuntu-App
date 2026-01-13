@@ -11,13 +11,13 @@ variable "vm_count" {
 variable "instance_name" {
   type        = string
   description = "Basis-Name der Instanz(en), z.B. 'webserver'"
-  default     = "myapp2"
+  default     = "ubuntu"
 }
 
 variable "image_name" {
   type        = string
   description = "Name des Packer-Images, das deployed werden soll"
-  default     = "myapp2-v1"
+  default     = "ubuntu-v1"
 }
 
 variable "flavor" {
@@ -51,7 +51,7 @@ variable "allow_icmp" {
 variable "key_pair" {
   type        = string
   description = "OpenStack Keypair Name (für SSH, meist fix pro Projekt)"
-  default     = ""
+  default     = "test-key-pair"
 }
 
 variable "network_uuid" {

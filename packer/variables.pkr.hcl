@@ -5,7 +5,7 @@
 variable "app_name" {
   type        = string
   description = "Logischer Name der Applikation / des Images"
-  default     = "myapp2"
+  default     = "ubuntu"
 }
 
 variable "app_version" {
@@ -45,7 +45,7 @@ variable "networks" {
 variable "security_groups" {
   type        = list(string)
   description = "Security Groups für die Build-VM"
-  default     = ["simple-webserver-sg-ff3ad318"]
+  default     = ["simple-webserver-sg-81ec1652"]
 }
 
 variable "ssh_username" {

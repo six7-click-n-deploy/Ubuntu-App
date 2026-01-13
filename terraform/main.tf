@@ -41,7 +41,7 @@ resource "random_id" "suffix" {
 # -----------------------------------------------------------------------------
 resource "openstack_networking_secgroup_v2" "app_sg" {
   name        = "${var.instance_name}-sg-${random_id.suffix.hex}"
-  description = "Security group for the instance"
+  description = "Security group for clean Ubuntu VM"
 }
 
 resource "openstack_networking_secgroup_rule_v2" "ssh" {
@@ -66,7 +66,7 @@ resource "openstack_networking_secgroup_rule_v2" "tcp" {
 }
 
 resource "openstack_networking_secgroup_rule_v2" "icmp" {
-  count             = var.allow_icmp ? 1 : 0
+  count = var.allow_icmp ? 1 : 0
   direction         = "ingress"
   ethertype         = "IPv4"
   protocol          = "icmp"
@@ -74,27 +74,7 @@ resource "openstack_networking_secgroup_rule_v2" "icmp" {
   security_group_id = openstack_networking_secgroup_v2.app_sg.id
 }
 
-# Allow HTTP 
-resource "openstack_networking_secgroup_rule_v2" "http" {
-  direction         = "ingress"
-  ethertype         = "IPv4"
-  protocol          = "tcp"
-  port_range_min    = 80
-  port_range_max    = 80
-  remote_ip_prefix  = "0.0.0.0/0"
-  security_group_id = openstack_networking_secgroup_v2.app_sg.id
-}
 
-# Allow HTTPS
-resource "openstack_networking_secgroup_rule_v2" "https" {
-  direction         = "ingress"
-  ethertype         = "IPv4"
-  protocol          = "tcp"
-  port_range_min    = 443
-  port_range_max    = 443
-  remote_ip_prefix  = "0.0.0.0/0"
-  security_group_id = openstack_networking_secgroup_v2.app_sg.id
-}
 
 # -----------------------------------------------------------------------------
 # Instance
@@ -119,13 +99,12 @@ resource "openstack_compute_instance_v2" "app" {
 # -----------------------------------------------------------------------------
 resource "openstack_networking_floatingip_v2" "fip" {
   count = var.enable_floating_ip ? 1 : 0
-  pool  = data.openstack_networking_network_v2.external.name
+  pool = data.openstack_networking_network_v2.external.name
 }
 
-resource "openstack_compute_floatingip_associate_v2" "fip_assoc" {
+resource "openstack_networking_floatingip_associate_v2" "fip_assoc" {
   count       = var.enable_floating_ip ? 1 : 0
   floating_ip = openstack_networking_floatingip_v2.fip[0].address
-  instance_id = openstack_compute_instance_v2.app.id
-
-  depends_on = [openstack_compute_instance_v2.app]
+  port_id     = openstack_compute_instance_v2.app.network[0].port
+  depends_on  = [openstack_compute_instance_v2.app]
 }
