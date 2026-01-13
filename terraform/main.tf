@@ -66,7 +66,7 @@ resource "openstack_networking_secgroup_rule_v2" "tcp" {
 }
 
 resource "openstack_networking_secgroup_rule_v2" "icmp" {
-  count = var.allow_icmp ? 1 : 0
+  count             = var.allow_icmp ? 1 : 0
   direction         = "ingress"
   ethertype         = "IPv4"
   protocol          = "icmp"
@@ -99,7 +99,7 @@ resource "openstack_compute_instance_v2" "app" {
 # -----------------------------------------------------------------------------
 resource "openstack_networking_floatingip_v2" "fip" {
   count = var.enable_floating_ip ? 1 : 0
-  pool = data.openstack_networking_network_v2.external.name
+  pool  = data.openstack_networking_network_v2.external.name
 }
 
 resource "openstack_networking_floatingip_associate_v2" "fip_assoc" {

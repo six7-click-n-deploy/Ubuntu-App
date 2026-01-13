@@ -57,13 +57,13 @@ variable "key_pair" {
 variable "network_uuid" {
   description = "UUID of the internal network to attach the instance to (NOT the external network)"
   type        = string
-  default     = "34a00b87-57ce-42c4-8e1b-9ea8a657ec2e"  
+  default     = "34a00b87-57ce-42c4-8e1b-9ea8a657ec2e"
 }
 
 variable "floating_ip_pool" {
   description = "Name of the floating IP pool (external network). Leave empty to use default."
   type        = string
-  default     = "DHBW"  
+  default     = "DHBW"
 }
 
 variable "ssh_cidr" {
