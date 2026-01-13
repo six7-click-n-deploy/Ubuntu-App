@@ -75,7 +75,7 @@ variable "volume_size" {
 variable "use_floating_ip" {
   type        = bool
   description = "Floating IP verwenden"
-  default     = false                                    
+  default     = false
 }
 
 variable "floating_ip_pool" {
