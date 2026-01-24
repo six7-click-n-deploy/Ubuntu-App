@@ -1,0 +1,71 @@
+#cloud-config
+# Ubuntu-App Multi-User Setup mit einfachen Test-Passwörtern
+
+# System-Update beim ersten Start
+package_update: true
+
+# Benutzer mit einfachen Passwörtern erstellen
+users:
+  - name: alice
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    groups: users, admin, sudo
+    shell: /bin/bash
+    lock_passwd: false
+    plain_text_passwd: hallo123
+    
+  - name: clara
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    groups: users, admin, sudo
+    shell: /bin/bash
+    lock_passwd: false
+    plain_text_passwd: test123
+    
+  - name: bob
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    groups: users, admin, sudo
+    shell: /bin/bash
+    lock_passwd: false
+    plain_text_passwd: einfach123
+    
+  - name: diana
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    groups: users, admin, sudo
+    shell: /bin/bash
+    lock_passwd: false
+    plain_text_passwd: ubuntu123
+
+# SSH-Konfiguration aktivieren  
+ssh_pwauth: true
+
+# Pakete installieren
+packages:
+  - curl
+  - wget
+  - git
+  - htop
+  - nano
+  - vim
+
+# SSH-Service neu starten und Konfiguration sicherstellen
+runcmd:
+  - sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config
+  - sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/' /etc/ssh/sshd_config
+  - systemctl restart ssh
+  - echo "Ubuntu-App Multi-User Setup abgeschlossen" >> /var/log/cloud-init-output.log
+  - echo "Verfügbare Benutzer:" >> /var/log/cloud-init-output.log
+  - echo "  alice:hallo123 (sudo)" >> /var/log/cloud-init-output.log  
+  - echo "  clara:test123 (sudo)" >> /var/log/cloud-init-output.log
+  - echo "  bob:einfach123 (sudo)" >> /var/log/cloud-init-output.log
+  - echo "  diana:ubuntu123 (sudo)" >> /var/log/cloud-init-output.log
+  
+# Final message
+final_message: |
+  Ubuntu-App Multi-User System ist bereit!
+  
+  Verfügbare Benutzer:
+  - alice:hallo123
+  - clara:test123  
+  - bob:einfach123
+  - diana:ubuntu123
+  
+  SSH-Login: ssh benutzername@<vm-ip>

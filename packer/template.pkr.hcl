@@ -19,7 +19,7 @@ source "openstack" "image" {
 
   security_groups = var.security_groups
 
-  use_blockstorage_volume = var.use_blockstorage_volume
+  use_blockstorage_volume = false
   volume_size             = var.volume_size
 
   use_floating_ip = var.use_floating_ip

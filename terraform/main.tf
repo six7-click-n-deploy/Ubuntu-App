@@ -10,6 +10,10 @@ terraform {
       source  = "hashicorp/random"
       version = "~> 3.5"
     }
+    time = {
+      source  = "hashicorp/time"
+      version = "~> 0.10"
+    }
   }
 }
 
@@ -91,6 +95,8 @@ resource "openstack_compute_instance_v2" "app" {
     uuid = var.network_uuid
   }
 
+  user_data = file("cloud-init.yml")
+
   metadata = var.metadata
 }
 
@@ -102,9 +108,31 @@ resource "openstack_networking_floatingip_v2" "fip" {
   pool  = data.openstack_networking_network_v2.external.name
 }
 
+# Warten bis VM vollständig gebootet ist
+resource "time_sleep" "wait_for_vm" {
+  count           = var.enable_floating_ip ? 1 : 0
+  depends_on      = [openstack_compute_instance_v2.app]
+  create_duration = "60s"
+}
+
+# Port-ID der VM finden
+data "openstack_networking_port_v2" "vm_port" {
+  count     = var.enable_floating_ip ? 1 : 0
+  device_id = openstack_compute_instance_v2.app.id
+  depends_on = [
+    openstack_compute_instance_v2.app,
+    time_sleep.wait_for_vm[0]
+  ]
+}
+
+# Floating IP Association mit data-basierter Port-ID
 resource "openstack_networking_floatingip_associate_v2" "fip_assoc" {
   count       = var.enable_floating_ip ? 1 : 0
   floating_ip = openstack_networking_floatingip_v2.fip[0].address
-  port_id     = openstack_compute_instance_v2.app.network[0].port
-  depends_on  = [openstack_compute_instance_v2.app]
+  port_id     = data.openstack_networking_port_v2.vm_port[0].id
+  
+  depends_on = [
+    data.openstack_networking_port_v2.vm_port[0],
+    time_sleep.wait_for_vm[0]
+  ]
 }
