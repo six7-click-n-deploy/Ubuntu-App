@@ -130,7 +130,7 @@ resource "openstack_networking_floatingip_associate_v2" "fip_assoc" {
   count       = var.enable_floating_ip ? 1 : 0
   floating_ip = openstack_networking_floatingip_v2.fip[0].address
   port_id     = data.openstack_networking_port_v2.vm_port[0].id
-  
+
   depends_on = [
     data.openstack_networking_port_v2.vm_port[0],
     time_sleep.wait_for_vm[0]
