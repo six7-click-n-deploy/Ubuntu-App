@@ -1,38 +1,8 @@
 #cloud-config
-# Ubuntu-App Multi-User Setup mit einfachen Test-Passwörtern
+# Ubuntu-App Dynamic Multi-User Setup
 
 # System-Update beim ersten Start
 package_update: true
-
-# Benutzer mit einfachen Passwörtern erstellen
-users:
-  - name: alice
-    sudo: ALL=(ALL) NOPASSWD:ALL
-    groups: users, admin, sudo
-    shell: /bin/bash
-    lock_passwd: false
-    plain_text_passwd: hallo123
-    
-  - name: clara
-    sudo: ALL=(ALL) NOPASSWD:ALL
-    groups: users, admin, sudo
-    shell: /bin/bash
-    lock_passwd: false
-    plain_text_passwd: test123
-    
-  - name: bob
-    sudo: ALL=(ALL) NOPASSWD:ALL
-    groups: users, admin, sudo
-    shell: /bin/bash
-    lock_passwd: false
-    plain_text_passwd: einfach123
-    
-  - name: diana
-    sudo: ALL=(ALL) NOPASSWD:ALL
-    groups: users, admin, sudo
-    shell: /bin/bash
-    lock_passwd: false
-    plain_text_passwd: ubuntu123
 
 # SSH-Konfiguration aktivieren  
 ssh_pwauth: true
@@ -45,27 +15,71 @@ packages:
   - htop
   - nano
   - vim
+  - openssl
+
+# Setup-Script für dynamische User-Erstellung
+write_files:
+  - path: /usr/local/bin/setup-users.sh
+    permissions: '0755'
+    owner: root:root
+    content: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+
+      USER_COUNT="${USER_COUNT:-1}"
+      USER_PREFIX="${USER_PREFIX:-user}"
+
+      if ! [[ "$USER_COUNT" =~ ^[0-9]+$ ]] || [ "$USER_COUNT" -lt 1 ]; then
+        echo "USER_COUNT muss eine Zahl >= 1 sein (war: '$USER_COUNT')" >&2
+        exit 1
+      fi
+
+      if [ -z "$USER_PREFIX" ]; then
+        echo "USER_PREFIX darf nicht leer sein" >&2
+        exit 1
+      fi
+
+      OUT_DIR="/var/lib/ubuntu-app"
+      OUT_FILE="$OUT_DIR/user-credentials.txt"
+      mkdir -p "$OUT_DIR"
+      chmod 700 "$OUT_DIR"
+
+      : > "$OUT_FILE"
+      chmod 600 "$OUT_FILE"
+
+      for i in $(seq 1 "$USER_COUNT"); do
+        username="${USER_PREFIX}${i}"
+        password="$(openssl rand -base64 24 | tr -d '+=/' 'ABC' | cut -c1-16)"
+
+        if id "$username" >/dev/null 2>&1; then
+          echo "User existiert bereits: $username – Passwort wird aktualisiert" >&2
+        else
+          useradd -m -s /bin/bash "$username"
+          usermod -aG sudo "$username" || true
+        fi
+
+        echo "${username}:${password}" | chpasswd
+        echo "${username}:${password}" >> "$OUT_FILE"
+        echo "Erstellt: $username mit Passwort" >&2
+      done
+
+      echo "Erstellt: $USER_COUNT User. Credentials: $OUT_FILE"
 
 # SSH-Service neu starten und Konfiguration sicherstellen
 runcmd:
   - sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config
   - sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/' /etc/ssh/sshd_config
   - systemctl restart ssh
+  - export USER_COUNT='${user_count}' USER_PREFIX='${user_prefix}'
+  - /usr/local/bin/setup-users.sh
   - echo "Ubuntu-App Multi-User Setup abgeschlossen" >> /var/log/cloud-init-output.log
-  - echo "Verfügbare Benutzer:" >> /var/log/cloud-init-output.log
-  - echo "  alice:hallo123 (sudo)" >> /var/log/cloud-init-output.log  
-  - echo "  clara:test123 (sudo)" >> /var/log/cloud-init-output.log
-  - echo "  bob:einfach123 (sudo)" >> /var/log/cloud-init-output.log
-  - echo "  diana:ubuntu123 (sudo)" >> /var/log/cloud-init-output.log
+  - echo "User-Credentials gespeichert unter /var/lib/ubuntu-app/user-credentials.txt" >> /var/log/cloud-init-output.log
   
 # Final message
 final_message: |
   Ubuntu-App Multi-User System ist bereit!
   
-  Verfügbare Benutzer:
-  - alice:hallo123
-  - clara:test123  
-  - bob:einfach123
-  - diana:ubuntu123
+  ${user_count} Benutzer wurden erstellt mit Prefix '${user_prefix}'
   
-  SSH-Login: ssh benutzername@<vm-ip>
+  Credentials verfügbar unter: /var/lib/ubuntu-app/user-credentials.txt
+  SSH-Login: ssh username@<vm-ip>

@@ -2,16 +2,33 @@
 # Frontend-Variablen
 ############################
 
+########################################
+# Custom-Variablen (Frontend) - Multi-VM Setup
+########################################
+
 variable "vm_count" {
+  description = "[FRONTEND] Anzahl VMs, die erstellt werden sollen"
   type        = number
   default     = 1
-  description = "Anzahl der VMs, die erstellt werden sollen"
+}
+
+variable "user_prefix" {
+  description = "[FRONTEND] Prefix für User-Namen (z.B. student1, student2...)"
+  type        = string
+  default     = "student"
+}
+
+variable "ubuntu_password" {
+  description = "[ADMIN] Ubuntu admin user password"
+  type        = string
+  default     = "admin"
+  sensitive   = true
 }
 
 variable "instance_name" {
   type        = string
   description = "Basis-Name der Instanz(en), z.B. 'webserver'"
-  default     = "ubuntu"
+  default     = "ubuntu-user"
 }
 
 variable "image_name" {

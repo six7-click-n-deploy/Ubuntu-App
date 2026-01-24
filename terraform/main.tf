@@ -81,13 +81,15 @@ resource "openstack_networking_secgroup_rule_v2" "icmp" {
 
 
 # -----------------------------------------------------------------------------
-# Instance
+# Multi-VM Setup: Pro Student eine separate VM erstellen
 # -----------------------------------------------------------------------------
-resource "openstack_compute_instance_v2" "app" {
-  name        = var.instance_name
-  image_id    = data.openstack_images_image_v2.image.id
-  flavor_name = var.flavor
-  key_pair    = var.key_pair
+resource "openstack_compute_instance_v2" "student_vms" {
+  count = var.vm_count
+  
+  name            = "${var.instance_name}-${var.user_prefix}${count.index + 1}"
+  image_id        = data.openstack_images_image_v2.image.id
+  flavor_name     = var.flavor
+  key_pair        = var.key_pair != "" ? var.key_pair : null
 
   security_groups = [openstack_networking_secgroup_v2.app_sg.name]
 
@@ -95,44 +97,53 @@ resource "openstack_compute_instance_v2" "app" {
     uuid = var.network_uuid
   }
 
-  user_data = file("cloud-init.yml")
+  # cloud-init: Ein User pro VM (student1, student2, etc.)
+  user_data = templatefile("${path.module}/cloud-init.yml.tpl", {
+    student_name    = "${var.user_prefix}${count.index + 1}"
+    ubuntu_password = var.ubuntu_password
+  })
 
-  metadata = var.metadata
+  metadata = merge(var.metadata, {
+    student_number = count.index + 1
+    student_name   = "${var.user_prefix}${count.index + 1}"
+  })
+
+  depends_on = [openstack_networking_secgroup_v2.app_sg]
 }
 
 # -----------------------------------------------------------------------------
-# Optional Floating IP (Neutron association)
+# Optional Floating IP (pro Student-VM)
 # -----------------------------------------------------------------------------
 resource "openstack_networking_floatingip_v2" "fip" {
-  count = var.enable_floating_ip ? 1 : 0
+  count = var.enable_floating_ip ? var.vm_count : 0
   pool  = data.openstack_networking_network_v2.external.name
 }
 
-# Warten bis VM vollständig gebootet ist
+# Warten bis VMs vollständig gebootet sind
 resource "time_sleep" "wait_for_vm" {
-  count           = var.enable_floating_ip ? 1 : 0
-  depends_on      = [openstack_compute_instance_v2.app]
+  count           = var.enable_floating_ip ? var.vm_count : 0
+  depends_on      = [openstack_compute_instance_v2.student_vms]
   create_duration = "60s"
 }
 
-# Port-ID der VM finden
+# Port-ID der VMs finden
 data "openstack_networking_port_v2" "vm_port" {
-  count     = var.enable_floating_ip ? 1 : 0
-  device_id = openstack_compute_instance_v2.app.id
+  count     = var.enable_floating_ip ? var.vm_count : 0
+  device_id = openstack_compute_instance_v2.student_vms[count.index].id
   depends_on = [
-    openstack_compute_instance_v2.app,
-    time_sleep.wait_for_vm[0]
+    openstack_compute_instance_v2.student_vms,
+    time_sleep.wait_for_vm
   ]
 }
 
 # Floating IP Association mit data-basierter Port-ID
 resource "openstack_networking_floatingip_associate_v2" "fip_assoc" {
-  count       = var.enable_floating_ip ? 1 : 0
-  floating_ip = openstack_networking_floatingip_v2.fip[0].address
-  port_id     = data.openstack_networking_port_v2.vm_port[0].id
+  count       = var.enable_floating_ip ? var.vm_count : 0
+  floating_ip = openstack_networking_floatingip_v2.fip[count.index].address
+  port_id     = data.openstack_networking_port_v2.vm_port[count.index].id
 
   depends_on = [
-    data.openstack_networking_port_v2.vm_port[0],
-    time_sleep.wait_for_vm[0]
+    data.openstack_networking_port_v2.vm_port,
+    time_sleep.wait_for_vm
   ]
 }
