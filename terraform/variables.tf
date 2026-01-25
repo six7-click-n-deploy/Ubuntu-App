@@ -6,16 +6,16 @@
 # Custom-Variablen (Frontend) - Multi-VM Setup
 ########################################
 
-variable "vm_count" {
-  description = "[FRONTEND] Anzahl VMs, die erstellt werden sollen"
-  type        = number
-  default     = 1
+variable "users" {
+  description = "[CONTRACT] User-Emails (vom Dozenten übermittelt) - eine VM pro E-Mail"
+  type        = list(string)
+  default     = ["student@dhbw.de"]
 }
 
-variable "user_prefix" {
-  description = "[FRONTEND] Prefix für User-Namen (z.B. student1, student2...)"
-  type        = string
-  default     = "student"
+variable "vm_count" {
+  description = "[INTERNAL] Anzahl VMs - wird automatisch aus users berechnet. Nicht direkt setzen!"
+  type        = number
+  default     = null
 }
 
 variable "ubuntu_password" {

@@ -1,5 +1,5 @@
 #cloud-config
-# Ubuntu-App Dynamic Multi-User Setup
+# Ubuntu-App Per-User Setup
 
 # System-Update beim ersten Start
 package_update: true
@@ -19,23 +19,24 @@ packages:
 
 # User erstellen (einer pro VM)
 users:
-  - name: ${user_prefix}
-    plain_text_passwd: ${ubuntu_password}
-    lock_passwd: false
-    groups: [sudo]
+  - name: ${username}
     shell: /bin/bash
-    sudo: ["ALL=(ALL) NOPASSWD:ALL"]
-
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    lock_passwd: false
+    plain_text_passwd: ${password}
+    home: /home/${username}
+    
 # SSH-Service neu starten und Konfiguration sicherstellen
 runcmd:
   - sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config
   - sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/' /etc/ssh/sshd_config
   - systemctl restart ssh
-  - echo "Ubuntu-App User Setup abgeschlossen für ${user_prefix}" >> /var/log/cloud-init-output.log
+  - echo "Ubuntu-App User Setup abgeschlossen für: ${username}" >> /var/log/cloud-init-output.log
   
 # Final message
 final_message: |
   Ubuntu-App System ist bereit!
   
-  User '${user_prefix}' wurde erstellt.
-  SSH-Login: ssh ${user_prefix}@<vm-ip>
+  Benutzer: ${username}
+  SSH-Login: ssh ${username}@<vm-ip>
+  Passwort: ${password}

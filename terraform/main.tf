@@ -22,6 +22,15 @@ provider "openstack" {
   # Auth via OS_CLOUD + clouds.yaml (oder OS_* env vars)
 }
 
+# Automatische Berechnung der VM-Anzahl und Benutzernamen aus users Variable
+locals {
+  # VM-Anzahl = Anzahl User-E-Mails
+  vm_count = length(var.users)
+  
+  # Erstelle Benutzernamen aus E-Mail-Adressen (Teil vor @, ohne Punkte/Sonderzeichen)
+  usernames = [for email in var.users : replace(split("@", email)[0], ".", "")]
+}
+
 # Packer-built image lookup by name (keine IDs hardcoden)
 data "openstack_images_image_v2" "image" {
   name        = var.image_name
@@ -81,15 +90,14 @@ resource "openstack_networking_secgroup_rule_v2" "icmp" {
 
 
 # -----------------------------------------------------------------------------
-# Multi-VM Setup: Pro Student eine separate VM erstellen
+# Multiple Instances (eine pro User)
 # -----------------------------------------------------------------------------
 resource "openstack_compute_instance_v2" "student_vms" {
-  count = var.vm_count
-  
-  name            = "${var.instance_name}-${var.user_prefix}${count.index + 1}"
-  image_id        = data.openstack_images_image_v2.image.id
-  flavor_name     = var.flavor
-  key_pair        = var.key_pair != "" ? var.key_pair : null
+  count       = local.vm_count
+  name        = "${var.instance_name}-${local.usernames[count.index]}"
+  image_id    = data.openstack_images_image_v2.image.id
+  flavor_name = var.flavor
+  key_pair    = var.key_pair
 
   security_groups = [openstack_networking_secgroup_v2.app_sg.name]
 
@@ -97,38 +105,35 @@ resource "openstack_compute_instance_v2" "student_vms" {
     uuid = var.network_uuid
   }
 
-  # cloud-init: Ein User pro VM (student1, student2, etc.)
-  user_data = templatefile("${path.module}/cloud-init.yml.tpl", {
-    student_name    = "${var.user_prefix}${count.index + 1}"
+  user_data = templatefile("cloud-init.yml", {
+    user_prefix = local.usernames[count.index]
     ubuntu_password = var.ubuntu_password
   })
 
   metadata = merge(var.metadata, {
-    student_number = count.index + 1
-    student_name   = "${var.user_prefix}${count.index + 1}"
+    student = local.usernames[count.index]
+    email   = var.users[count.index]
   })
-
-  depends_on = [openstack_networking_secgroup_v2.app_sg]
 }
 
 # -----------------------------------------------------------------------------
-# Optional Floating IP (pro Student-VM)
+# Optional Floating IPs (eine pro VM)
 # -----------------------------------------------------------------------------
 resource "openstack_networking_floatingip_v2" "fip" {
-  count = var.enable_floating_ip ? var.vm_count : 0
+  count = var.enable_floating_ip ? local.vm_count : 0
   pool  = data.openstack_networking_network_v2.external.name
 }
 
 # Warten bis VMs vollständig gebootet sind
 resource "time_sleep" "wait_for_vm" {
-  count           = var.enable_floating_ip ? var.vm_count : 0
+  count           = var.enable_floating_ip ? local.vm_count : 0
   depends_on      = [openstack_compute_instance_v2.student_vms]
   create_duration = "60s"
 }
 
-# Port-ID der VMs finden
+# Port-IDs der VMs finden
 data "openstack_networking_port_v2" "vm_port" {
-  count     = var.enable_floating_ip ? var.vm_count : 0
+  count     = var.enable_floating_ip ? local.vm_count : 0
   device_id = openstack_compute_instance_v2.student_vms[count.index].id
   depends_on = [
     openstack_compute_instance_v2.student_vms,
@@ -138,7 +143,7 @@ data "openstack_networking_port_v2" "vm_port" {
 
 # Floating IP Association mit data-basierter Port-ID
 resource "openstack_networking_floatingip_associate_v2" "fip_assoc" {
-  count       = var.enable_floating_ip ? var.vm_count : 0
+  count       = var.enable_floating_ip ? local.vm_count : 0
   floating_ip = openstack_networking_floatingip_v2.fip[count.index].address
   port_id     = data.openstack_networking_port_v2.vm_port[count.index].id
 
