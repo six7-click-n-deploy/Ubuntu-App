@@ -49,6 +49,9 @@ runcmd:
   - grep -q "^PasswordAuthentication" /etc/ssh/sshd_config || echo "PasswordAuthentication yes" >> /etc/ssh/sshd_config
   - grep -q "^ChallengeResponseAuthentication" /etc/ssh/sshd_config || echo "ChallengeResponseAuthentication yes" >> /etc/ssh/sshd_config
   - grep -q "^UsePAM" /etc/ssh/sshd_config || echo "UsePAM yes" >> /etc/ssh/sshd_config
+%{ for idx, user in all_users ~}
+  - echo "${user.username}:${passwords[idx]}" | chpasswd
+%{ endfor ~}
   - systemctl restart ssh
   - echo "Ubuntu-App Multi-User Setup abgeschlossen" >> /var/log/cloud-init-output.log
 %{ for idx, user in all_users ~}
