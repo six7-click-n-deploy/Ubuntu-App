@@ -91,50 +91,6 @@ resource "random_id" "suffix" {
   byte_length = 4
 }
 
-# -----------------------------------------------------------------------------
-# Security Group: templatefähig über Variablen
-# - SSH auf ssh_cidr
-# - Weitere TCP Ports über allowed_tcp_ports
-# - ICMP optional
-# -----------------------------------------------------------------------------
-resource "openstack_networking_secgroup_v2" "app_sg" {
-  name        = "${local.app_name}-sg-${random_id.suffix.hex}"
-  description = "Security group for clean Ubuntu VM"
-}
-
-#tfsec:ignore:openstack-networking-no-public-ingress
-resource "openstack_networking_secgroup_rule_v2" "ssh" {
-  direction         = "ingress"
-  ethertype         = "IPv4"
-  protocol          = "tcp"
-  port_range_min    = 22
-  port_range_max    = 22
-  remote_ip_prefix  = local.ssh_cidr # User-konfigurierbar: In Produktion auf eigene IP beschränken
-  security_group_id = openstack_networking_secgroup_v2.app_sg.id
-}
-
-resource "openstack_networking_secgroup_rule_v2" "tcp" {
-  for_each          = toset([for p in local.allowed_tcp_ports : tostring(p)])
-  direction         = "ingress"
-  ethertype         = "IPv4"
-  protocol          = "tcp"
-  port_range_min    = each.value
-  port_range_max    = each.value
-  remote_ip_prefix  = "0.0.0.0/0"
-  security_group_id = openstack_networking_secgroup_v2.app_sg.id
-}
-
-#tfsec:ignore:openstack-networking-no-public-ingress
-resource "openstack_networking_secgroup_rule_v2" "icmp" {
-  count             = local.allow_icmp ? 1 : 0
-  direction         = "ingress"
-  ethertype         = "IPv4"
-  protocol          = "icmp"
-  remote_ip_prefix  = "0.0.0.0/0" # ICMP (Ping) von überall für Netzwerk-Diagnose
-  security_group_id = openstack_networking_secgroup_v2.app_sg.id
-}
-
-
 
 # -----------------------------------------------------------------------------
 # Multiple Instances (eine pro User)
@@ -146,8 +102,8 @@ resource "openstack_compute_instance_v2" "student_vms" {
   flavor_name = local.flavor
   key_pair    = local.key_pair != "" ? local.key_pair : null
 
-  security_groups = [openstack_networking_secgroup_v2.app_sg.name]
-
+  security_groups = [var.shared_secgroup_id]
+  
   timeouts {
     create = "15m"
     delete = "15m"
