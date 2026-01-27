@@ -55,8 +55,11 @@ locals {
     ]
   ])
 
-  # VM-Anzahl = Anzahl aller User (unabhängig von Teams)
-  vm_count = length(local.all_users)
+  # Eindeutige Teams extrahieren
+  unique_teams = distinct([for user in local.all_users : user.team])
+
+  # VM-Anzahl = 1 (eine gemeinsame VM)
+  vm_count = 1
 
   # Liste aller Usernamen und E-Mails
   usernames = [for user in local.all_users : user.username]
@@ -66,7 +69,7 @@ locals {
 
 # Passwörter für jeden User generieren
 resource "random_password" "user_passwords" {
-  count   = local.vm_count
+  count   = length(local.all_users)
   length  = 16
   special = true
   # Mindestens: 1 Uppercase, 1 Lowercase, 1 Zahl, 1 Sonderzeichen
@@ -95,15 +98,14 @@ resource "random_id" "suffix" {
 # -----------------------------------------------------------------------------
 # Multiple Instances (eine pro User)
 # -----------------------------------------------------------------------------
-resource "openstack_compute_instance_v2" "student_vms" {
-  count       = local.vm_count
-  name        = "${local.app_name}-${local.usernames[count.index]}"
+resource "openstack_compute_instance_v2" "shared_vm" {
+  name        = "${local.app_name}-shared"
   image_id    = data.openstack_images_image_v2.image.id
   flavor_name = local.flavor
   key_pair    = local.key_pair != "" ? local.key_pair : null
 
   security_groups = [var.shared_secgroup_id]
-  
+
   timeouts {
     create = "15m"
     delete = "15m"
@@ -113,48 +115,49 @@ resource "openstack_compute_instance_v2" "student_vms" {
     uuid = var.network_uuid
   }
 
-  user_data = templatefile("${path.module}/cloud-init-user.yml.tpl", {
-    username = local.usernames[count.index]
-    password = random_password.user_passwords[count.index].result
+  user_data = templatefile("${path.module}/cloud-init-multi-user.yml.tpl", {
+    all_users     = local.all_users
+    unique_teams  = local.unique_teams
+    passwords     = [for p in random_password.user_passwords : p.result]
   })
 
   metadata = merge(local.metadata, {
-    student = local.usernames[count.index]
-    email   = local.emails[count.index]
-    team    = local.all_users[count.index].team
+    teams   = join(",", local.unique_teams)
+    users   = join(",", local.usernames)
+    emails  = join(",", local.emails)
   })
 }
 
 # -----------------------------------------------------------------------------
-# Optional Floating IPs (eine pro VM)
+# Optional Floating IP (eine für die gemeinsame VM)
 # -----------------------------------------------------------------------------
 resource "openstack_networking_floatingip_v2" "fip" {
-  count = local.enable_floating_ip ? local.vm_count : 0
+  count = local.enable_floating_ip ? 1 : 0
   pool  = data.openstack_networking_network_v2.external.name
 }
 
-# Warten bis VMs vollständig gebootet sind
+# Warten bis VM vollständig gebootet ist
 resource "time_sleep" "wait_for_vm" {
-  count           = local.enable_floating_ip ? local.vm_count : 0
-  depends_on      = [openstack_compute_instance_v2.student_vms]
+  count           = local.enable_floating_ip ? 1 : 0
+  depends_on      = [openstack_compute_instance_v2.shared_vm]
   create_duration = "60s"
 }
 
-# Port-IDs der VMs finden
+# Port-ID der VM finden
 data "openstack_networking_port_v2" "vm_port" {
-  count     = local.enable_floating_ip ? local.vm_count : 0
-  device_id = openstack_compute_instance_v2.student_vms[count.index].id
+  count     = local.enable_floating_ip ? 1 : 0
+  device_id = openstack_compute_instance_v2.shared_vm.id
   depends_on = [
-    openstack_compute_instance_v2.student_vms,
+    openstack_compute_instance_v2.shared_vm,
     time_sleep.wait_for_vm
   ]
 }
 
 # Floating IP Association mit data-basierter Port-ID
 resource "openstack_networking_floatingip_associate_v2" "fip_assoc" {
-  count       = local.enable_floating_ip ? local.vm_count : 0
-  floating_ip = openstack_networking_floatingip_v2.fip[count.index].address
-  port_id     = data.openstack_networking_port_v2.vm_port[count.index].id
+  count       = local.enable_floating_ip ? 1 : 0
+  floating_ip = openstack_networking_floatingip_v2.fip[0].address
+  port_id     = data.openstack_networking_port_v2.vm_port[0].id
 
   depends_on = [
     data.openstack_networking_port_v2.vm_port,

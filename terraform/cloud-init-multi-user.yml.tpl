@@ -1,10 +1,10 @@
 #cloud-config
-# Ubuntu-App Per-User Setup
+# Ubuntu-App Multi-User Setup
 
 # System-Update beim ersten Start
 package_update: true
 
-# SSH-Konfiguration aktivieren  
+# SSH-Konfiguration aktivieren
 ssh_pwauth: true
 
 # Pakete installieren
@@ -17,15 +17,24 @@ packages:
   - vim
   - openssl
 
-# User erstellen (einer pro VM)
+# Gruppen für jedes Team erstellen
+groups:
+%{ for team in unique_teams ~}
+  - ${team}
+%{ endfor ~}
+
+# Benutzer erstellen (einer pro User)
 users:
-  - name: ${username}
+%{ for idx, user in all_users ~}
+  - name: ${user.username}
     shell: /bin/bash
     sudo: ALL=(ALL) NOPASSWD:ALL
     lock_passwd: false
-    plain_text_passwd: ${password}
-    home: /home/${username}
-    
+    plain_text_passwd: ${passwords[idx]}
+    home: /home/${user.username}
+    groups: [${user.team}]
+%{ endfor ~}
+
 # SSH-Service neu starten und Konfiguration sicherstellen
 runcmd:
   - sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config
@@ -35,12 +44,15 @@ runcmd:
   - sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin no/' /etc/ssh/sshd_config
   - grep -q "^PasswordAuthentication" /etc/ssh/sshd_config || echo "PasswordAuthentication yes" >> /etc/ssh/sshd_config
   - systemctl restart ssh
-  - echo "Ubuntu-App User Setup abgeschlossen für: ${username}" >> /var/log/cloud-init-output.log
-  
+  - echo "Ubuntu-App Multi-User Setup abgeschlossen" >> /var/log/cloud-init-output.log
+%{ for idx, user in all_users ~}
+  - echo "Benutzer: ${user.username}, Team: ${user.team}, Passwort: ${passwords[idx]}" >> /var/log/cloud-init-output.log
+%{ endfor ~}
+
 # Final message
 final_message: |
   Ubuntu-App System ist bereit!
-  
-  Benutzer: ${username}
-  SSH-Login: ssh ${username}@<vm-ip>
-  Passwort: ${password}
+
+  Teams: ${join(", ", unique_teams)}
+  Benutzer können sich mit SSH anmelden: ssh <username>@<vm-ip>
+  Passwörter sind in /var/log/cloud-init-output.log gespeichert.
