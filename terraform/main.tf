@@ -32,9 +32,6 @@ locals {
   flavor             = "gp1.small"
   key_pair           = "" # Leer = nur Passwort-Auth
   enable_floating_ip = true
-  ssh_cidr           = "0.0.0.0/0" # SSH-Zugriff von überall erlauben
-  allow_icmp         = true
-  allowed_tcp_ports  = [] # Leer = nur SSH
   metadata           = {}
 }
 
