@@ -30,7 +30,7 @@ users:
     shell: /bin/bash
     sudo: ALL=(ALL) NOPASSWD:ALL
     lock_passwd: false
-    plain_text_passwd: ${passwords[idx]}
+    passwd: ${passwords[idx]}
     home: /home/${user.username}
     groups: [${user.team}]
 %{ endfor ~}
@@ -39,10 +39,16 @@ users:
 runcmd:
   - sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config
   - sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/' /etc/ssh/sshd_config
+  - sed -i 's/#ChallengeResponseAuthentication no/ChallengeResponseAuthentication yes/' /etc/ssh/sshd_config
+  - sed -i 's/ChallengeResponseAuthentication no/ChallengeResponseAuthentication yes/' /etc/ssh/sshd_config
+  - sed -i 's/#UsePAM no/UsePAM yes/' /etc/ssh/sshd_config
+  - sed -i 's/UsePAM no/UsePAM yes/' /etc/ssh/sshd_config
   - sed -i 's/#PubkeyAuthentication yes/PubkeyAuthentication yes/' /etc/ssh/sshd_config
   - sed -i 's/PubkeyAuthentication no/PubkeyAuthentication yes/' /etc/ssh/sshd_config
   - sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin no/' /etc/ssh/sshd_config
   - grep -q "^PasswordAuthentication" /etc/ssh/sshd_config || echo "PasswordAuthentication yes" >> /etc/ssh/sshd_config
+  - grep -q "^ChallengeResponseAuthentication" /etc/ssh/sshd_config || echo "ChallengeResponseAuthentication yes" >> /etc/ssh/sshd_config
+  - grep -q "^UsePAM" /etc/ssh/sshd_config || echo "UsePAM yes" >> /etc/ssh/sshd_config
   - systemctl restart ssh
   - echo "Ubuntu-App Multi-User Setup abgeschlossen" >> /var/log/cloud-init-output.log
 %{ for idx, user in all_users ~}
