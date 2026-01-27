@@ -116,15 +116,15 @@ resource "openstack_compute_instance_v2" "shared_vm" {
   }
 
   user_data = templatefile("${path.module}/cloud-init-multi-user.yml.tpl", {
-    all_users     = local.all_users
-    unique_teams  = local.unique_teams
-    passwords     = [for p in random_password.user_passwords : p.result]
+    all_users    = local.all_users
+    unique_teams = local.unique_teams
+    passwords    = [for p in random_password.user_passwords : p.result]
   })
 
   metadata = merge(local.metadata, {
-    teams   = join(",", local.unique_teams)
-    users   = join(",", local.usernames)
-    emails  = join(",", local.emails)
+    teams  = join(",", local.unique_teams)
+    users  = join(",", local.usernames)
+    emails = join(",", local.emails)
   })
 }
 
