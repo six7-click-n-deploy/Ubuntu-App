@@ -1,10 +1,6 @@
 #cloud-config
-# Ubuntu-App Multi-User Setup
 
-# System-Update beim ersten Start
-package_update: true
-
-# SSH-Konfiguration aktivieren
+# SSH mit Passwort-Auth aktivieren
 ssh_pwauth: true
 
 # Pakete installieren
@@ -16,6 +12,7 @@ packages:
   - nano
   - vim
   - openssl
+  - net-tools
 
 # Gruppen für jedes Team erstellen
 groups:
@@ -23,45 +20,58 @@ groups:
   - ${team}
 %{ endfor ~}
 
-# Benutzer erstellen (einer pro User)
+# Benutzer erstellen
 users:
 %{ for idx, user in all_users ~}
   - name: ${user.username}
     shell: /bin/bash
-    sudo: ALL=(ALL) NOPASSWD:ALL
+    sudo: ['ALL=(ALL) ALL']
+    groups: ${user.team}
     lock_passwd: false
-    passwd: ${passwords[idx]}
-    home: /home/${user.username}
-    groups: [${user.team}]
 %{ endfor ~}
 
-# SSH-Service neu starten und Konfiguration sicherstellen
+# SSH-Konfiguration in separate Datei
+write_files:
+  - path: /etc/ssh/sshd_config.d/99-custom.conf
+    content: |
+      PasswordAuthentication yes
+      PubkeyAuthentication yes
+      PermitRootLogin no
+      UsePAM yes
+    permissions: '0644'
+
+# Setup-Befehle
 runcmd:
-  - sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config
-  - sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/' /etc/ssh/sshd_config
-  - sed -i 's/#ChallengeResponseAuthentication no/ChallengeResponseAuthentication yes/' /etc/ssh/sshd_config
-  - sed -i 's/ChallengeResponseAuthentication no/ChallengeResponseAuthentication yes/' /etc/ssh/sshd_config
-  - sed -i 's/#UsePAM no/UsePAM yes/' /etc/ssh/sshd_config
-  - sed -i 's/UsePAM no/UsePAM yes/' /etc/ssh/sshd_config
-  - sed -i 's/#PubkeyAuthentication yes/PubkeyAuthentication yes/' /etc/ssh/sshd_config
-  - sed -i 's/PubkeyAuthentication no/PubkeyAuthentication yes/' /etc/ssh/sshd_config
-  - sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin no/' /etc/ssh/sshd_config
-  - grep -q "^PasswordAuthentication" /etc/ssh/sshd_config || echo "PasswordAuthentication yes" >> /etc/ssh/sshd_config
-  - grep -q "^ChallengeResponseAuthentication" /etc/ssh/sshd_config || echo "ChallengeResponseAuthentication yes" >> /etc/ssh/sshd_config
-  - grep -q "^UsePAM" /etc/ssh/sshd_config || echo "UsePAM yes" >> /etc/ssh/sshd_config
+  # Passwörter setzen (ungehashed)
 %{ for idx, user in all_users ~}
-  - echo "${user.username}:${passwords[idx]}" | chpasswd
+  - echo '${user.username}:${passwords[idx]}' | chpasswd
 %{ endfor ~}
-  - systemctl restart ssh
-  - echo "Ubuntu-App Multi-User Setup abgeschlossen" >> /var/log/cloud-init-output.log
-%{ for idx, user in all_users ~}
-  - echo "Benutzer: ${user.username}, Team: ${user.team}, Passwort: ${passwords[idx]}" >> /var/log/cloud-init-output.log
-%{ endfor ~}
+  
+  # SSH-Service neu starten
+  - systemctl restart sshd
+  
+  # Optional: Firewall
+  - ufw --force enable
+  - ufw allow OpenSSH
+  
+  # Setup-Log (OHNE Passwörter aus Sicherheitsgründen)
+  - |
+    cat >> /var/log/setup-complete.log <<EOF
+    ================================================
+    Setup abgeschlossen: $(date)
+    ================================================
+    Teams: ${join(", ", unique_teams)}
+    Benutzer erstellt: ${length(all_users)}
+    ================================================
+    EOF
 
-# Final message
+# Abschlussnachricht
 final_message: |
-  Ubuntu-App System ist bereit!
-
+  ================================================
+  Ubuntu Multi-User System bereit!
+  ================================================
   Teams: ${join(", ", unique_teams)}
-  Benutzer können sich mit SSH anmelden: ssh <username>@<vm-ip>
-  Passwörter sind in /var/log/cloud-init-output.log gespeichert.
+  Benutzer: ${length(all_users)}
+  
+  SSH-Login: ssh <username>@<vm-ip>
+  ================================================
