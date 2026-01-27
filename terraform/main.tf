@@ -22,13 +22,58 @@ provider "openstack" {
   # Auth via OS_CLOUD + clouds.yaml (oder OS_* env vars)
 }
 
-# Automatische Berechnung der VM-Anzahl und Benutzernamen aus users Variable
-locals {
-  # VM-Anzahl = Anzahl User-E-Mails
-  vm_count = length(var.users)
+############################
+# APP-DEFAULTS (vom App-Entwickler vorgegeben)
+############################
 
-  # Erstelle Benutzernamen aus E-Mail-Adressen (Teil vor @, ohne Punkte/Sonderzeichen)
-  usernames = [for email in var.users : replace(split("@", email)[0], ".", "")]
+locals {
+  # Diese Werte sind App-spezifisch und werden vom App-Entwickler definiert
+  app_name           = "ubuntu-user"
+  flavor             = "gp1.small"
+  key_pair           = "" # Leer = nur Passwort-Auth
+  enable_floating_ip = true
+  ssh_cidr           = "0.0.0.0/0" # SSH-Zugriff von überall erlauben
+  allow_icmp         = true
+  allowed_tcp_ports  = [] # Leer = nur SSH
+  metadata           = {}
+}
+
+############################
+# USER MANAGEMENT (CONTRACT)
+############################
+
+# Flatten users from teams - EXAKT wie im Contract vorgegeben
+locals {
+  all_users = flatten([
+    for team, members in var.users : [
+      for member in members : {
+        id       = "${team}-${replace(split("@", member.email)[0], ".", "-")}"
+        team     = team
+        email    = member.email
+        username = replace(split("@", member.email)[0], ".", "")
+      }
+    ]
+  ])
+
+  # VM-Anzahl = Anzahl aller User (unabhängig von Teams)
+  vm_count = length(local.all_users)
+
+  # Liste aller Usernamen und E-Mails
+  usernames = [for user in local.all_users : user.username]
+  emails    = [for user in local.all_users : user.email]
+  user_ids  = [for user in local.all_users : user.id]
+}
+
+# Passwörter für jeden User generieren
+resource "random_password" "user_passwords" {
+  count   = local.vm_count
+  length  = 16
+  special = true
+  # Mindestens: 1 Uppercase, 1 Lowercase, 1 Zahl, 1 Sonderzeichen
+  min_upper   = 1
+  min_lower   = 1
+  min_numeric = 1
+  min_special = 1
 }
 
 # Packer-built image lookup by name (keine IDs hardcoden)
@@ -53,7 +98,7 @@ resource "random_id" "suffix" {
 # - ICMP optional
 # -----------------------------------------------------------------------------
 resource "openstack_networking_secgroup_v2" "app_sg" {
-  name        = "${var.instance_name}-sg-${random_id.suffix.hex}"
+  name        = "${local.app_name}-sg-${random_id.suffix.hex}"
   description = "Security group for clean Ubuntu VM"
 }
 
@@ -64,12 +109,12 @@ resource "openstack_networking_secgroup_rule_v2" "ssh" {
   protocol          = "tcp"
   port_range_min    = 22
   port_range_max    = 22
-  remote_ip_prefix  = var.ssh_cidr # User-konfigurierbar: In Produktion auf eigene IP beschränken
+  remote_ip_prefix  = local.ssh_cidr # User-konfigurierbar: In Produktion auf eigene IP beschränken
   security_group_id = openstack_networking_secgroup_v2.app_sg.id
 }
 
 resource "openstack_networking_secgroup_rule_v2" "tcp" {
-  for_each          = toset(var.allowed_tcp_ports)
+  for_each          = toset([for p in local.allowed_tcp_ports : tostring(p)])
   direction         = "ingress"
   ethertype         = "IPv4"
   protocol          = "tcp"
@@ -81,7 +126,7 @@ resource "openstack_networking_secgroup_rule_v2" "tcp" {
 
 #tfsec:ignore:openstack-networking-no-public-ingress
 resource "openstack_networking_secgroup_rule_v2" "icmp" {
-  count             = var.allow_icmp ? 1 : 0
+  count             = local.allow_icmp ? 1 : 0
   direction         = "ingress"
   ethertype         = "IPv4"
   protocol          = "icmp"
@@ -96,25 +141,31 @@ resource "openstack_networking_secgroup_rule_v2" "icmp" {
 # -----------------------------------------------------------------------------
 resource "openstack_compute_instance_v2" "student_vms" {
   count       = local.vm_count
-  name        = "${var.instance_name}-${local.usernames[count.index]}"
+  name        = "${local.app_name}-${local.usernames[count.index]}"
   image_id    = data.openstack_images_image_v2.image.id
-  flavor_name = var.flavor
-  key_pair    = var.key_pair
+  flavor_name = local.flavor
+  key_pair    = local.key_pair != "" ? local.key_pair : null
 
   security_groups = [openstack_networking_secgroup_v2.app_sg.name]
+
+  timeouts {
+    create = "15m"
+    delete = "15m"
+  }
 
   network {
     uuid = var.network_uuid
   }
 
-  user_data = templatefile("cloud-init.yml", {
-    user_prefix     = local.usernames[count.index]
-    ubuntu_password = var.ubuntu_password
+  user_data = templatefile("${path.module}/cloud-init-user.yml.tpl", {
+    username = local.usernames[count.index]
+    password = random_password.user_passwords[count.index].result
   })
 
-  metadata = merge(var.metadata, {
+  metadata = merge(local.metadata, {
     student = local.usernames[count.index]
-    email   = var.users[count.index]
+    email   = local.emails[count.index]
+    team    = local.all_users[count.index].team
   })
 }
 
@@ -122,20 +173,20 @@ resource "openstack_compute_instance_v2" "student_vms" {
 # Optional Floating IPs (eine pro VM)
 # -----------------------------------------------------------------------------
 resource "openstack_networking_floatingip_v2" "fip" {
-  count = var.enable_floating_ip ? local.vm_count : 0
+  count = local.enable_floating_ip ? local.vm_count : 0
   pool  = data.openstack_networking_network_v2.external.name
 }
 
 # Warten bis VMs vollständig gebootet sind
 resource "time_sleep" "wait_for_vm" {
-  count           = var.enable_floating_ip ? local.vm_count : 0
+  count           = local.enable_floating_ip ? local.vm_count : 0
   depends_on      = [openstack_compute_instance_v2.student_vms]
   create_duration = "60s"
 }
 
 # Port-IDs der VMs finden
 data "openstack_networking_port_v2" "vm_port" {
-  count     = var.enable_floating_ip ? local.vm_count : 0
+  count     = local.enable_floating_ip ? local.vm_count : 0
   device_id = openstack_compute_instance_v2.student_vms[count.index].id
   depends_on = [
     openstack_compute_instance_v2.student_vms,
@@ -145,7 +196,7 @@ data "openstack_networking_port_v2" "vm_port" {
 
 # Floating IP Association mit data-basierter Port-ID
 resource "openstack_networking_floatingip_associate_v2" "fip_assoc" {
-  count       = var.enable_floating_ip ? local.vm_count : 0
+  count       = local.enable_floating_ip ? local.vm_count : 0
   floating_ip = openstack_networking_floatingip_v2.fip[count.index].address
   port_id     = data.openstack_networking_port_v2.vm_port[count.index].id
 
