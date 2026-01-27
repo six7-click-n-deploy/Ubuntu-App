@@ -12,12 +12,6 @@ variable "users" {
   default     = ["student@dhbw.de"]
 }
 
-variable "vm_count" {
-  description = "[INTERNAL] Anzahl VMs - wird automatisch aus users berechnet. Nicht direkt setzen!"
-  type        = number
-  default     = null
-}
-
 variable "ubuntu_password" {
   description = "[ADMIN] Ubuntu admin user password"
   type        = string
@@ -86,7 +80,7 @@ variable "floating_ip_pool" {
 variable "ssh_cidr" {
   type        = string
   default     = "0.0.0.0/0"
-  description = "CIDR, aus der SSH erlaubt ist (empfohlen: deine.ip/32)"
+  description = "CIDR für SSH-Zugriff. WARNUNG: 0.0.0.0/0 erlaubt globalen Zugriff! In Produktion auf eigene IP beschränken (z.B. 203.0.113.5/32)"
 }
 
 variable "metadata" {

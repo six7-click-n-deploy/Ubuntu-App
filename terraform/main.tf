@@ -57,13 +57,14 @@ resource "openstack_networking_secgroup_v2" "app_sg" {
   description = "Security group for clean Ubuntu VM"
 }
 
+#tfsec:ignore:openstack-networking-no-public-ingress
 resource "openstack_networking_secgroup_rule_v2" "ssh" {
   direction         = "ingress"
   ethertype         = "IPv4"
   protocol          = "tcp"
   port_range_min    = 22
   port_range_max    = 22
-  remote_ip_prefix  = var.ssh_cidr
+  remote_ip_prefix  = var.ssh_cidr # User-konfigurierbar: In Produktion auf eigene IP beschränken
   security_group_id = openstack_networking_secgroup_v2.app_sg.id
 }
 
@@ -78,12 +79,13 @@ resource "openstack_networking_secgroup_rule_v2" "tcp" {
   security_group_id = openstack_networking_secgroup_v2.app_sg.id
 }
 
+#tfsec:ignore:openstack-networking-no-public-ingress
 resource "openstack_networking_secgroup_rule_v2" "icmp" {
   count             = var.allow_icmp ? 1 : 0
   direction         = "ingress"
   ethertype         = "IPv4"
   protocol          = "icmp"
-  remote_ip_prefix  = "0.0.0.0/0"
+  remote_ip_prefix  = "0.0.0.0/0" # ICMP (Ping) von überall für Netzwerk-Diagnose
   security_group_id = openstack_networking_secgroup_v2.app_sg.id
 }
 
