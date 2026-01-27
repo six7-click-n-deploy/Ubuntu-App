@@ -26,7 +26,7 @@ provider "openstack" {
 locals {
   # VM-Anzahl = Anzahl User-E-Mails
   vm_count = length(var.users)
-  
+
   # Erstelle Benutzernamen aus E-Mail-Adressen (Teil vor @, ohne Punkte/Sonderzeichen)
   usernames = [for email in var.users : replace(split("@", email)[0], ".", "")]
 }
@@ -106,7 +106,7 @@ resource "openstack_compute_instance_v2" "student_vms" {
   }
 
   user_data = templatefile("cloud-init.yml", {
-    user_prefix = local.usernames[count.index]
+    user_prefix     = local.usernames[count.index]
     ubuntu_password = var.ubuntu_password
   })
 
