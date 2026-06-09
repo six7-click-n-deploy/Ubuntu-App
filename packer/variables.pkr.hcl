@@ -10,7 +10,7 @@ variable "image_name" {
 
 variable "networks" {
   type        = list(string)
-  description = "@openstack:networks:id:list"
+  description = "@openstack:network:id:list"
   default     = ["4971e080-966d-485e-a161-3e2b7fefad53"]
 }
 
