@@ -17,25 +17,25 @@ variable "users" {
 ########################################
 
 variable "image_name" {
-  description = "[BACKEND] Name des Packer-Images aus Glance (z.B. ubuntu-v1)"
+  description = "@openstack:image:name"
   type        = string
   default     = "ubuntu-vX"
 }
 
 variable "network_uuid" {
-  description = "@openstack:network[:name][:single]"
+  description = "@openstack:network:id"
   type        = string
   default     = "34a00b87-57ce-42c4-8e1b-9ea8a657ec2e"
 }
 
 variable "floating_ip_pool" {
-  description = "@openstack:floating_ip_pool[:name][:single]"
+  description = "@openstack:floating_ip_pool:name"
   type        = string
   default     = "DHBW"
 }
 
 variable "shared_secgroup_id" {
-  description = "@openstack:security_group[:name][:single]"
+  description = "@openstack:security_group:id"
   type        = string
   default     = "4ffaf007-df66-4250-9118-1bd99378d34a"
 }
