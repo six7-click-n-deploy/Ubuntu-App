@@ -4,7 +4,7 @@ terraform {
   required_providers {
     openstack = {
       source  = "terraform-provider-openstack/openstack"
-      version = "~> 1.53"
+      version = "~> 1.54"
     }
     random = {
       source  = "hashicorp/random"
@@ -66,14 +66,14 @@ locals {
 
 # Passwörter für jeden User generieren
 resource "random_password" "user_passwords" {
-  count   = length(local.all_users)
-  length  = 16
-  special = true
-  # Mindestens: 1 Uppercase, 1 Lowercase, 1 Zahl, 1 Sonderzeichen
-  min_upper   = 1
-  min_lower   = 1
-  min_numeric = 1
-  min_special = 1
+  count            = length(local.all_users)
+  length           = 16
+  special          = true
+  override_special = "!@%^*_-+="
+  min_upper        = 1
+  min_lower        = 1
+  min_numeric      = 1
+  min_special      = 1
 }
 
 # Packer-built image lookup by name (keine IDs hardcoden)
@@ -87,13 +87,8 @@ data "openstack_networking_network_v2" "external" {
   name = var.floating_ip_pool
 }
 
-resource "random_id" "suffix" {
-  byte_length = 4
-}
-
-
 # -----------------------------------------------------------------------------
-# Multiple Instances (eine pro User)
+# Shared VM
 # -----------------------------------------------------------------------------
 resource "openstack_compute_instance_v2" "shared_vm" {
   name        = "${local.app_name}-shared"

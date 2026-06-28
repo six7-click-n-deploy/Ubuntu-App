@@ -23,7 +23,7 @@ output "user_accounts" {
 # VM Details
 ############################
 
-output "vm_details" {
+output "team_vms" {
   description = "Details der gemeinsamen VM und aller Benutzer"
   value = local.vm_count > 0 ? {
     shared_vm = {
@@ -40,7 +40,7 @@ output "vm_details" {
   } : {}
 }
 
-output "users_summary" {
+output "teams_summary" {
   description = "Übersicht: Anzahl VMs und User"
   value = {
     vm_count   = local.vm_count
