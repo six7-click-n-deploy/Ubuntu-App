@@ -41,13 +41,16 @@ write_files:
     permissions: '0644'
 
 # Setup-Befehle
-runcmd:
-  # Passwörter setzen (ungehashed)
+chpasswd:
+  expire: false
+  users:
 %{ for idx, user in all_users ~}
-  - echo '${user.username}:${passwords[idx]}' | chpasswd
+    - name: ${user.username}
+      password: ${passwords[idx]}
+      type: text
 %{ endfor ~}
-  
-  # SSH-Service neu starten
+
+runcmd:
   - systemctl restart sshd
   
   # Optional: Firewall
