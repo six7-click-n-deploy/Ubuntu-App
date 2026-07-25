@@ -2,36 +2,36 @@
 set -euo pipefail
 
 # -----------------------------------------------------------------------------
-# Provisioning Script für Golden Ubuntu 26.04 Image
-# - Basistools + Python + Node.js
-# - Linux-Lernverzeichnis unter /etc/skel/linux-kurs/ (wird in jeden neuen
-#   Home-Ordner kopiert)
-# - Idempotent, reproduzierbar, CI/CD-tauglich
+# Provisioning script for Golden Ubuntu 26.04 image
+# - Base tools + Python + Node.js
+# - Linux course directory at /etc/skel/linux-kurs/ (copied into every new
+#   home directory)
+# - Idempotent, reproducible, CI/CD-ready
 # -----------------------------------------------------------------------------
 
 NODE_MAJOR=24
 
-echo "Warte auf cloud-init (sofern vorhanden)..."
+echo "Waiting for cloud-init (if present)..."
 cloud-init status --wait || true
 
-echo "System aktualisieren..."
+echo "Updating system..."
 sudo apt-get update
 sudo DEBIAN_FRONTEND=noninteractive apt-get -y upgrade
 
-echo "Installiere minimale Basis-Tools..."
+echo "Installing minimal base tools..."
 sudo apt-get install -y --no-install-recommends \
   curl \
   ca-certificates \
   gnupg \
   tree
 
-echo "Installiere Python..."
+echo "Installing Python..."
 sudo apt-get install -y --no-install-recommends \
   python3 \
   python3-pip \
   python3-venv
 
-echo "Füge NodeSource Repository für Node.js ${NODE_MAJOR}.x hinzu..."
+echo "Adding NodeSource repository for Node.js ${NODE_MAJOR}.x..."
 sudo mkdir -p /etc/apt/keyrings
 
 curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key \
@@ -44,22 +44,22 @@ Components: main
 Signed-By: /etc/apt/keyrings/nodesource.gpg" \
   | sudo tee /etc/apt/sources.list.d/nodesource.sources > /dev/null
 
-echo "Installiere Node.js..."
+echo "Installing Node.js..."
 sudo apt-get update
 sudo apt-get install -y --no-install-recommends nodejs
 
-# SSH-Passwort-Authentifizierung vorbereiten (für cloud-init)
-# Drop-in unter sshd_config.d/ — überschreibt nicht die Hauptdatei
-echo "Bereite SSH für Passwort-Auth vor..."
+# Prepare SSH password authentication (for cloud-init)
+# Drop-in under sshd_config.d/ — does not overwrite the main config file
+echo "Configuring SSH for password authentication..."
 sudo mkdir -p /etc/ssh/sshd_config.d
 printf 'PasswordAuthentication yes\n' \
   | sudo tee /etc/ssh/sshd_config.d/60-password-auth.conf > /dev/null
 
 # =============================================================================
-# Linux-Lernverzeichnis
-# Wird unter /etc/skel/ abgelegt -> automatisch in jeden neuen Home-Ordner
+# Linux course directory
+# Placed under /etc/skel/ -> automatically copied into every new home directory
 # =============================================================================
-echo "Erstelle Linux-Lernverzeichnis..."
+echo "Creating Linux course directory..."
 
 KURS_DIR="/etc/skel/linux-kurs"
 sudo mkdir -p \
@@ -70,316 +70,316 @@ sudo mkdir -p \
   "${KURS_DIR}/uebungen/05-textverarbeitung" \
   "${KURS_DIR}/beispieldaten"
 
-# --- Kurzanleitung (LIES_MICH.txt) ------------------------------------------
+# --- Quick reference guide (LIES_MICH.txt) ----------------------------------
 sudo tee "${KURS_DIR}/LIES_MICH.txt" > /dev/null << 'EOF'
 ╔══════════════════════════════════════════════════════════════════════════════╗
-║                    LINUX TERMINAL – KURZANLEITUNG                          ║
+║                    LINUX TERMINAL – QUICK REFERENCE                        ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
 
-Willkommen auf deiner Linux-VM!
-Dieses Verzeichnis enthält Übungsaufgaben und eine Kurzreferenz der wichtigsten
-Terminal-Befehle. Starte mit den Aufgaben in den Unterordnern.
+Welcome to your Linux VM!
+This directory contains exercises and a quick reference for the most important
+terminal commands. Start with the tasks in the subdirectories.
 
-  tree linux-kurs/          → Zeigt die komplette Verzeichnisstruktur
-  cat linux-kurs/LIES_MICH.txt   → Diese Datei erneut lesen
+  tree linux-kurs/          → Show the full directory structure
+  cat linux-kurs/LIES_MICH.txt   → Read this file again
 
 ──────────────────────────────────────────────────────────────────────────────
  1. NAVIGATION
 ──────────────────────────────────────────────────────────────────────────────
-  pwd                  Aktuelles Verzeichnis anzeigen (Print Working Directory)
-  ls                   Verzeichnisinhalt auflisten
-  ls -la               Ausführliche Liste inkl. versteckter Dateien
-  cd ordner/           In Ordner wechseln
-  cd ..                Eine Ebene höher gehen
-  cd ~                 In Home-Verzeichnis wechseln
-  cd -                 Zum vorherigen Verzeichnis zurück
+  pwd                  Print current working directory
+  ls                   List directory contents
+  ls -la               Long listing including hidden files
+  cd ordner/           Change into directory
+  cd ..                Go up one level
+  cd ~                 Go to home directory
+  cd -                 Return to previous directory
 
 ──────────────────────────────────────────────────────────────────────────────
- 2. DATEIEN & VERZEICHNISSE
+ 2. FILES & DIRECTORIES
 ──────────────────────────────────────────────────────────────────────────────
-  touch datei.txt      Leere Datei erstellen
-  mkdir ordner         Neuen Ordner anlegen
-  mkdir -p a/b/c       Verschachtelte Ordner auf einmal anlegen
-  cp quelle ziel       Datei kopieren
-  cp -r ordner/ ziel/  Ordner rekursiv kopieren
-  mv alt neu           Datei verschieben oder umbenennen
-  rm datei.txt         Datei löschen
-  rm -r ordner/        Ordner mit Inhalt löschen (Vorsicht!)
-  tree                 Verzeichnisbaum grafisch anzeigen
+  touch datei.txt      Create an empty file
+  mkdir ordner         Create a new directory
+  mkdir -p a/b/c       Create nested directories at once
+  cp quelle ziel       Copy a file
+  cp -r ordner/ ziel/  Copy directory recursively
+  mv alt neu           Move or rename a file
+  rm datei.txt         Delete a file
+  rm -r ordner/        Delete directory with contents (caution!)
+  tree                 Display directory tree
 
 ──────────────────────────────────────────────────────────────────────────────
- 3. DATEIINHALT LESEN & BEARBEITEN
+ 3. FILE CONTENT – READ & EDIT
 ──────────────────────────────────────────────────────────────────────────────
-  cat datei.txt        Gesamten Inhalt ausgeben
-  less datei.txt       Inhalt seitenweise lesen (q = beenden)
-  head -n 10 datei     Erste 10 Zeilen
-  tail -n 10 datei     Letzte 10 Zeilen
-  nano datei.txt       Einfacher Text-Editor (Strg+O = speichern, Strg+X = beenden)
-  grep "wort" datei    Nach "wort" in einer Datei suchen
-  grep -r "wort" .     Rekursiv im aktuellen Verzeichnis suchen
+  cat datei.txt        Print entire file contents
+  less datei.txt       Read content page by page (q = quit)
+  head -n 10 datei     First 10 lines
+  tail -n 10 datei     Last 10 lines
+  nano datei.txt       Simple text editor (Ctrl+O = save, Ctrl+X = quit)
+  grep "wort" datei    Search for "word" in a file
+  grep -r "wort" .     Search recursively in current directory
 
 ──────────────────────────────────────────────────────────────────────────────
- 4. BERECHTIGUNGEN
+ 4. PERMISSIONS
 ──────────────────────────────────────────────────────────────────────────────
-  ls -l                Rechte anzeigen (rwxrwxrwx = owner/group/others)
-  chmod 755 datei      Rechte setzen (7=rwx, 5=rx, 4=r)
-  chmod +x skript.sh   Ausführbar machen
-  chown user datei     Besitzer ändern
-  sudo befehl          Befehl als Administrator ausführen
+  ls -l                Show permissions (rwxrwxrwx = owner/group/others)
+  chmod 755 datei      Set permissions (7=rwx, 5=rx, 4=r)
+  chmod +x skript.sh   Make executable
+  chown user datei     Change owner
+  sudo befehl          Run command as administrator
 
-  Rechte-Kurzübersicht:
-    r = lesen (4)
-    w = schreiben (2)
-    x = ausführen (1)
-    Beispiel: 644 = rw-r--r--  (owner lesen+schreiben, rest nur lesen)
-
-──────────────────────────────────────────────────────────────────────────────
- 5. PROZESSE
-──────────────────────────────────────────────────────────────────────────────
-  ps aux               Alle laufenden Prozesse
-  top                  Live-Prozessübersicht (q = beenden)
-  htop                 Verbesserte Prozessübersicht (falls installiert)
-  kill PID             Prozess beenden (PID aus ps oder top ablesen)
-  kill -9 PID          Prozess sofort erzwingen zu beenden
-  befehl &             Befehl im Hintergrund starten
-  jobs                 Hintergrundprozesse anzeigen
+  Permissions quick reference:
+    r = read (4)
+    w = write (2)
+    x = execute (1)
+    Example: 644 = rw-r--r--  (owner read+write, others read-only)
 
 ──────────────────────────────────────────────────────────────────────────────
- 6. TEXTVERARBEITUNG & UMLEITUNGEN
+ 5. PROCESSES
 ──────────────────────────────────────────────────────────────────────────────
-  echo "Text"          Text ausgeben
-  echo "Text" > a.txt  Text in Datei schreiben (überschreibt)
-  echo "Text" >> a.txt Text an Datei anhängen
-  befehl | grep "x"   Ausgabe filtern (Pipe)
-  wc -l datei.txt      Zeilen zählen
-  sort datei.txt       Zeilen sortieren
-  uniq datei.txt       Duplikate entfernen (nach sort verwenden)
-  cut -d',' -f1 datei  Spalte aus CSV ausschneiden
+  ps aux               List all running processes
+  top                  Live process overview (q = quit)
+  htop                 Enhanced process viewer (if installed)
+  kill PID             Terminate process (get PID from ps or top)
+  kill -9 PID          Force-kill process immediately
+  befehl &             Run command in background
+  jobs                 List background jobs
 
 ──────────────────────────────────────────────────────────────────────────────
- 7. NETZWERK & SYSTEM
+ 6. TEXT PROCESSING & REDIRECTIONS
 ──────────────────────────────────────────────────────────────────────────────
-  ip a                 Netzwerkinterfaces und IP-Adressen
-  ping google.com      Verbindungstest
-  curl https://...     URL abrufen
-  df -h                Festplattennutzung
-  du -sh ordner/       Ordnergröße
-  free -h              RAM-Nutzung
-  uname -a             Systeminformation
-  uptime               Laufzeit und Auslastung
-  history              Befehlshistorie
-  which python3        Pfad eines Programms finden
-  journalctl -n 50     Letzte 50 Systemlog-Einträge (ersetzt /var/log/syslog)
+  echo "Text"          Print text
+  echo "Text" > a.txt  Write text to file (overwrites)
+  echo "Text" >> a.txt Append text to file
+  befehl | grep "x"   Filter output (pipe)
+  wc -l datei.txt      Count lines
+  sort datei.txt       Sort lines
+  uniq datei.txt       Remove duplicates (use after sort)
+  cut -d',' -f1 datei  Extract column from CSV
 
 ──────────────────────────────────────────────────────────────────────────────
- 8. HILFE BEKOMMEN
+ 7. NETWORK & SYSTEM
 ──────────────────────────────────────────────────────────────────────────────
-  man ls               Handbuchseite für "ls" (q = beenden)
-  ls --help            Kurzhilfe für die meisten Befehle
-  info befehl          Ausführlichere Dokumentation
+  ip a                 Network interfaces and IP addresses
+  ping google.com      Connection test
+  curl https://...     Fetch a URL
+  df -h                Disk usage
+  du -sh ordner/       Directory size
+  free -h              RAM usage
+  uname -a             System information
+  uptime               Uptime and load
+  history              Command history
+  which python3        Find the path of a program
+  journalctl -n 50     Last 50 system log entries (replaces /var/log/syslog)
 
 ──────────────────────────────────────────────────────────────────────────────
- Tipp: Nutze TAB für Autovervollständigung und Pfeiltasten für Befehlshistorie!
+ 8. GETTING HELP
+──────────────────────────────────────────────────────────────────────────────
+  man ls               Manual page for "ls" (q = quit)
+  ls --help            Short help for most commands
+  info befehl          More detailed documentation
+
+──────────────────────────────────────────────────────────────────────────────
+ Tip: Use TAB for auto-completion and arrow keys for command history!
 ──────────────────────────────────────────────────────────────────────────────
 EOF
 
-# --- Übung 01: Navigation ----------------------------------------------------
+# --- Exercise 01: Navigation -------------------------------------------------
 sudo tee "${KURS_DIR}/uebungen/01-navigation/aufgaben.txt" > /dev/null << 'EOF'
-ÜBUNG 1 – Navigation im Dateisystem
-====================================
+EXERCISE 1 – Navigating the Filesystem
+=======================================
 
-Aufgabe 1: Wo bin ich?
-  Finde heraus, in welchem Verzeichnis du dich gerade befindest.
-  Befehl: pwd
+Task 1: Where am I?
+  Find out which directory you are currently in.
+  Command: pwd
 
-Aufgabe 2: Was ist hier drin?
-  Liste den Inhalt deines Home-Verzeichnisses auf — auch versteckte Dateien.
-  Befehl: ls -la ~
+Task 2: What is here?
+  List the contents of your home directory — including hidden files.
+  Command: ls -la ~
 
-Aufgabe 3: Wechseln
-  a) Wechsle in das Verzeichnis /tmp
-  b) Gehe zurück in dein Home-Verzeichnis
-  c) Wechsle in das linux-kurs-Verzeichnis ohne den vollen Pfad zu schreiben
-  Befehl: cd, cd ~, cd -
+Task 3: Navigating
+  a) Change into the /tmp directory
+  b) Go back to your home directory
+  c) Change into the linux-kurs directory without typing the full path
+  Commands: cd, cd ~, cd -
 
-Aufgabe 4: Verzeichnisbaum
-  Zeige die Struktur des linux-kurs-Verzeichnisses als Baum an.
-  Befehl: tree ~/linux-kurs
+Task 4: Directory tree
+  Display the structure of the linux-kurs directory as a tree.
+  Command: tree ~/linux-kurs
 
-Aufgabe 5: Pfade erkunden
-  Was steht in /etc? Was in /var/log?
-  Befehl: ls /etc | head -20
+Task 5: Exploring paths
+  What is in /etc? What in /var/log?
+  Command: ls /etc | head -20
 EOF
 
-# --- Übung 02: Dateien -------------------------------------------------------
+# --- Exercise 02: Files ------------------------------------------------------
 sudo tee "${KURS_DIR}/uebungen/02-dateien/aufgaben.txt" > /dev/null << 'EOF'
-ÜBUNG 2 – Dateien und Verzeichnisse
+EXERCISE 2 – Files and Directories
 =====================================
 
-Aufgabe 1: Erstellen
-  Erstelle im Ordner uebungen/02-dateien/:
-  a) Eine leere Datei namens "notizen.txt"
-  b) Einen Unterordner "entwuerfe"
-  c) Die Ordnerstruktur "projekte/web/css" in einem Befehl
-  Befehle: touch, mkdir, mkdir -p
+Task 1: Create
+  Create the following inside uebungen/02-dateien/:
+  a) An empty file named "notizen.txt"
+  b) A subdirectory "entwuerfe"
+  c) The directory structure "projekte/web/css" in a single command
+  Commands: touch, mkdir, mkdir -p
 
-Aufgabe 2: Inhalt schreiben
-  Schreibe "Mein erster Linux-Text" in notizen.txt.
-  Hänge eine zweite Zeile "Zweite Zeile" an die Datei an.
-  Befehle: echo "..." > datei, echo "..." >> datei
+Task 2: Write content
+  Write "My first Linux text" into notizen.txt.
+  Append a second line "Second line" to the file.
+  Commands: echo "..." > datei, echo "..." >> datei
 
-Aufgabe 3: Lesen
-  Zeige den Inhalt von notizen.txt an.
-  Befehl: cat notizen.txt
+Task 3: Read
+  Display the contents of notizen.txt.
+  Command: cat notizen.txt
 
-Aufgabe 4: Kopieren und verschieben
-  a) Kopiere notizen.txt als "notizen_backup.txt" in den Ordner "entwuerfe/"
-  b) Benenne notizen.txt in "meine_notizen.txt" um
-  Befehle: cp, mv
+Task 4: Copy and move
+  a) Copy notizen.txt as "notizen_backup.txt" into the "entwuerfe/" directory
+  b) Rename notizen.txt to "meine_notizen.txt"
+  Commands: cp, mv
 
-Aufgabe 5: Aufräumen
-  Lösche den Ordner "entwuerfe/" mitsamt Inhalt.
-  Befehl: rm -r entwuerfe/
-  ACHTUNG: rm löscht unwiderruflich — kein Papierkorb!
+Task 5: Clean up
+  Delete the "entwuerfe/" directory and all its contents.
+  Command: rm -r entwuerfe/
+  WARNING: rm deletes permanently — no trash bin!
 EOF
 
-# --- Übung 03: Berechtigungen ------------------------------------------------
+# --- Exercise 03: Permissions ------------------------------------------------
 sudo tee "${KURS_DIR}/uebungen/03-berechtigungen/aufgaben.txt" > /dev/null << 'EOF'
-ÜBUNG 3 – Berechtigungen
+EXERCISE 3 – Permissions
 ==========================
 
-Aufgabe 1: Rechte lesen
-  Erstelle eine Datei "test.txt" und zeige ihre Berechtigungen an.
-  Was bedeuten die Zeichen in der ersten Spalte?
-  Befehl: touch test.txt && ls -l test.txt
+Task 1: Read permissions
+  Create a file "test.txt" and display its permissions.
+  What do the characters in the first column mean?
+  Command: touch test.txt && ls -l test.txt
 
-Aufgabe 2: Rechte setzen (numerisch)
-  Setze die Rechte auf:
-  a) 644 — owner lesen+schreiben, alle anderen nur lesen
-  b) 600 — nur der owner darf lesen und schreiben
-  c) 755 — owner alles, alle anderen lesen+ausführen
-  Befehl: chmod 644 test.txt
+Task 2: Set permissions (numeric)
+  Set the permissions to:
+  a) 644 — owner read+write, everyone else read-only
+  b) 600 — only the owner may read and write
+  c) 755 — owner full access, everyone else read+execute
+  Command: chmod 644 test.txt
 
-Aufgabe 3: Skript ausführbar machen
-  Erstelle eine Datei "hallo.sh" mit folgendem Inhalt:
+Task 3: Make a script executable
+  Create a file "hallo.sh" with the following content:
     #!/bin/bash
-    echo "Hallo, $(whoami)!"
-  Mache sie ausführbar und starte sie.
-  Befehle: nano hallo.sh, chmod +x hallo.sh, ./hallo.sh
+    echo "Hello, $(whoami)!"
+  Make it executable and run it.
+  Commands: nano hallo.sh, chmod +x hallo.sh, ./hallo.sh
 
-Aufgabe 4: Bedeutung von rwx
-  Erkläre in eigenen Worten:
-  -rw-r--r-- 1 alice alice 42 Jan 1 12:00 geheim.txt
-  - Wer darf lesen?
-  - Wer darf schreiben?
-  - Wer darf ausführen?
+Task 4: Meaning of rwx
+  Explain in your own words:
+  -rw-r--r-- 1 alice alice 42 Jan 1 12:00 secret.txt
+  - Who may read?
+  - Who may write?
+  - Who may execute?
 EOF
 
-# --- Übung 04: Prozesse ------------------------------------------------------
+# --- Exercise 04: Processes --------------------------------------------------
 sudo tee "${KURS_DIR}/uebungen/04-prozesse/aufgaben.txt" > /dev/null << 'EOF'
-ÜBUNG 4 – Prozesse
+EXERCISE 4 – Processes
 ===================
 
-Aufgabe 1: Prozesse anzeigen
-  Zeige alle laufenden Prozesse an.
-  Filtere die Ausgabe: Zeige nur Python-Prozesse.
-  Befehle: ps aux, ps aux | grep python
+Task 1: List processes
+  Display all running processes.
+  Filter the output: show only Python processes.
+  Commands: ps aux, ps aux | grep python
 
-Aufgabe 2: Live-Übersicht
-  Öffne die Live-Prozessübersicht. Welcher Prozess verbraucht am meisten CPU?
-  Befehl: top  (q zum Beenden)
+Task 2: Live overview
+  Open the live process monitor. Which process uses the most CPU?
+  Command: top  (q to quit)
 
-Aufgabe 3: Hintergrundprozess
-  Starte folgenden Befehl im Hintergrund:
+Task 3: Background process
+  Start the following command in the background:
     sleep 60 &
-  Zeige deine Hintergrundprozesse an.
-  Finde die PID des sleep-Prozesses und beende ihn.
-  Befehle: jobs, ps aux | grep sleep, kill <PID>
+  List your background jobs.
+  Find the PID of the sleep process and terminate it.
+  Commands: jobs, ps aux | grep sleep, kill <PID>
 
-Aufgabe 4: Prozess-Info
-  Finde heraus, welche PID deine aktuelle Shell hat.
-  Befehl: echo $$
+Task 4: Process info
+  Find out the PID of your current shell.
+  Command: echo $$
 EOF
 
-# --- Übung 05: Textverarbeitung ----------------------------------------------
+# --- Exercise 05: Text processing --------------------------------------------
 sudo tee "${KURS_DIR}/uebungen/05-textverarbeitung/aufgaben.txt" > /dev/null << 'EOF'
-ÜBUNG 5 – Textverarbeitung und Pipes
+EXERCISE 5 – Text Processing and Pipes
 ======================================
 
-Aufgabe 1: Suchen mit grep
-  Suche in /etc/passwd nach deinem Benutzernamen.
-  Befehl: grep "$(whoami)" /etc/passwd
+Task 1: Search with grep
+  Search /etc/passwd for your username.
+  Command: grep "$(whoami)" /etc/passwd
 
-Aufgabe 2: Zeilen zählen
-  Wie viele Benutzer gibt es auf dem System?
-  Befehl: wc -l /etc/passwd
+Task 2: Count lines
+  How many users are on the system?
+  Command: wc -l /etc/passwd
 
-Aufgabe 3: Sortieren
-  Erstelle eine Datei "zahlen.txt" mit folgenden Zeilen:
+Task 3: Sort
+  Create a file "zahlen.txt" with the following lines:
     42
     7
     100
     3
     55
-  Sortiere die Datei numerisch.
-  Befehle: nano zahlen.txt, sort -n zahlen.txt
+  Sort the file numerically.
+  Commands: nano zahlen.txt, sort -n zahlen.txt
 
-Aufgabe 4: Pipes kombinieren
-  Zeige die 5 größten Dateien im /var/log-Verzeichnis.
-  Befehl: du -sh /var/log/* 2>/dev/null | sort -rh | head -5
+Task 4: Combine pipes
+  Show the 5 largest files in the /var/log directory.
+  Command: du -sh /var/log/* 2>/dev/null | sort -rh | head -5
 
-Aufgabe 5: Text ersetzen mit sed
-  Ersetze in einer Textdatei das Wort "alt" durch "neu".
-  Befehl: sed 's/alt/neu/g' datei.txt
+Task 5: Replace text with sed
+  Replace the word "alt" with "neu" in a text file.
+  Command: sed 's/alt/neu/g' datei.txt
 
-Aufgabe 6 (Bonus): Log-Analyse
-  Zeige die letzten 100 Systemlog-Einträge und filtere nach "error".
-  Befehl: journalctl -n 100 | grep -i "error"
+Task 6 (Bonus): Log analysis
+  Show the last 100 system log entries and filter for "error".
+  Command: journalctl -n 100 | grep -i "error"
 EOF
 
-# --- Beispieldaten -----------------------------------------------------------
+# --- Sample data -------------------------------------------------------------
 sudo tee "${KURS_DIR}/beispieldaten/studenten.csv" > /dev/null << 'EOF'
-name,matrikelnummer,studiengang,semester
-Alice Müller,1234567,Informatik,3
-Bob Schmidt,2345678,Wirtschaftsinformatik,5
-Carol Weber,3456789,Informatik,1
-David Bauer,4567890,Medieninformatik,7
-Eva Koch,5678901,Informatik,3
-Frank Meier,6789012,Wirtschaftsinformatik,2
+name,student_id,program,semester
+Alice Müller,1234567,Computer Science,3
+Bob Schmidt,2345678,Business Informatics,5
+Carol Weber,3456789,Computer Science,1
+David Bauer,4567890,Media Informatics,7
+Eva Koch,5678901,Computer Science,3
+Frank Meier,6789012,Business Informatics,2
 EOF
 
 sudo tee "${KURS_DIR}/beispieldaten/server.log" > /dev/null << 'EOF'
-2024-01-15 08:12:03 INFO  Server gestartet auf Port 8080
-2024-01-15 08:12:05 INFO  Datenbank verbunden
+2024-01-15 08:12:03 INFO  Server started on port 8080
+2024-01-15 08:12:05 INFO  Database connected
 2024-01-15 08:15:22 INFO  GET /api/users 200 OK
-2024-01-15 08:16:01 ERROR Verbindung zu Cache-Server fehlgeschlagen
-2024-01-15 08:16:02 WARN  Fallback auf direkten DB-Zugriff
+2024-01-15 08:16:01 ERROR Connection to cache server failed
+2024-01-15 08:16:02 WARN  Falling back to direct DB access
 2024-01-15 08:20:44 INFO  POST /api/login 200 OK
 2024-01-15 08:31:10 INFO  GET /api/data 200 OK
-2024-01-15 08:45:00 ERROR Timeout bei Anfrage /api/report nach 30s
-2024-01-15 09:00:00 INFO  Backup gestartet
-2024-01-15 09:00:45 INFO  Backup abgeschlossen (1.2 GB)
-2024-01-15 09:15:33 WARN  Hohe CPU-Auslastung: 87%
+2024-01-15 08:45:00 ERROR Timeout on request /api/report after 30s
+2024-01-15 09:00:00 INFO  Backup started
+2024-01-15 09:00:45 INFO  Backup completed (1.2 GB)
+2024-01-15 09:15:33 WARN  High CPU load: 87%
 2024-01-15 09:20:11 INFO  GET /api/users 200 OK
-2024-01-15 09:45:00 ERROR Datenbankabfrage fehlgeschlagen: timeout
-2024-01-15 10:00:00 INFO  System läuft normal
+2024-01-15 09:45:00 ERROR Database query failed: timeout
+2024-01-15 10:00:00 INFO  System running normally
 EOF
 
 sudo tee "${KURS_DIR}/beispieldaten/README.txt" > /dev/null << 'EOF'
-Beispieldaten für Terminal-Übungen
+Sample data for terminal exercises
 ====================================
 
-studenten.csv  – CSV-Datei mit Studierenden (für Aufgaben mit cut, grep, sort)
-server.log     – Simuliertes Server-Log   (für Aufgaben mit grep, tail, wc)
+studenten.csv  – CSV file with student records (for exercises with cut, grep, sort)
+server.log     – Simulated server log        (for exercises with grep, tail, wc)
 
-Probiere zum Beispiel:
+Try for example:
   grep "ERROR" server.log
   cut -d',' -f1,3 studenten.csv
-  grep "Informatik" studenten.csv | wc -l
+  grep "Computer Science" studenten.csv | wc -l
   sort -t',' -k4 -n studenten.csv
 EOF
 
-# Lesbar für alle, schreiben nur root
+# World-readable, root-writable only
 sudo chmod -R 755 "${KURS_DIR}"
 sudo chmod 644 \
   "${KURS_DIR}/LIES_MICH.txt" \
@@ -392,18 +392,18 @@ sudo chmod 644 \
   "${KURS_DIR}/uebungen/04-prozesse/aufgaben.txt" \
   "${KURS_DIR}/uebungen/05-textverarbeitung/aufgaben.txt"
 
-echo "Prüfe Versionen..."
+echo "Checking versions..."
 python3 --version
 pip3 --version
 node --version
 npm --version
 
-echo "Cleanup: apt-Cache & Listen entfernen..."
+echo "Cleanup: removing apt cache and lists..."
 sudo apt-get clean
 sudo rm -rf /var/lib/apt/lists/*
 
-echo "Setze machine-id zurück..."
+echo "Resetting machine-id..."
 sudo truncate -s 0 /etc/machine-id
 sudo rm -f /var/lib/dbus/machine-id || true
 
-echo "Provisioning abgeschlossen."
+echo "Provisioning complete."

@@ -1,9 +1,7 @@
 #cloud-config
 
-# SSH mit Passwort-Auth aktivieren
 ssh_pwauth: true
 
-# Pakete installieren
 packages:
   - curl
   - wget
@@ -14,13 +12,12 @@ packages:
   - openssl
   - net-tools
 
-# Gruppen für jedes Team erstellen
+# Create one group per team
 groups:
 %{ for team in unique_teams ~}
   - ${team}
 %{ endfor ~}
 
-# Benutzer erstellen
 users:
 %{ for idx, user in all_users ~}
   - name: ${user.username}
@@ -30,7 +27,7 @@ users:
     lock_passwd: false
 %{ endfor ~}
 
-# SSH-Konfiguration in separate Datei
+# SSH config overrides via drop-in file
 write_files:
   - path: /etc/ssh/sshd_config.d/99-custom.conf
     content: |
@@ -40,7 +37,6 @@ write_files:
       UsePAM yes
     permissions: '0644'
 
-# Setup-Befehle
 chpasswd:
   expire: false
   users:
@@ -52,29 +48,28 @@ chpasswd:
 
 runcmd:
   - systemctl restart sshd
-  
-  # Optional: Firewall
+
+  # Optional: firewall
   - ufw --force enable
   - ufw allow OpenSSH
-  
-  # Setup-Log (OHNE Passwörter aus Sicherheitsgründen)
+
+  # Setup log — passwords intentionally omitted for security
   - |
     cat >> /var/log/setup-complete.log <<EOF
     ================================================
-    Setup abgeschlossen: $(date)
+    Setup completed: $(date)
     ================================================
     Teams: ${join(", ", unique_teams)}
-    Benutzer erstellt: ${length(all_users)}
+    Users created: ${length(all_users)}
     ================================================
     EOF
 
-# Abschlussnachricht
 final_message: |
   ================================================
-  Ubuntu Multi-User System bereit!
+  Ubuntu Multi-User System ready!
   ================================================
   Teams: ${join(", ", unique_teams)}
-  Benutzer: ${length(all_users)}
-  
-  SSH-Login: ssh <username>@<vm-ip>
+  Users: ${length(all_users)}
+
+  SSH login: ssh <username>@<vm-ip>
   ================================================

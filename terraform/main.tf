@@ -19,18 +19,17 @@ terraform {
 
 provider "openstack" {
   cloud = "openstack"
-  # Auth via OS_CLOUD + clouds.yaml (oder OS_* env vars)
+  # Auth via OS_CLOUD + clouds.yaml (or OS_* env vars)
 }
 
 ############################
-# APP-DEFAULTS (vom App-Entwickler vorgegeben)
+# APP-DEFAULTS (defined by the app developer)
 ############################
 
 locals {
-  # Diese Werte sind App-spezifisch und werden vom App-Entwickler definiert
   app_name           = "ubuntu-user"
   flavor             = "gp1.small"
-  key_pair           = "" # Leer = nur Passwort-Auth
+  key_pair           = "" # Empty = password auth only
   enable_floating_ip = true
   metadata           = {}
 }
@@ -39,7 +38,7 @@ locals {
 # USER MANAGEMENT (CONTRACT)
 ############################
 
-# Flatten users from teams - EXAKT wie im Contract vorgegeben
+# Flatten users from teams - exactly as specified by the contract
 locals {
   all_users = flatten([
     for team, members in var.users : [
@@ -52,19 +51,16 @@ locals {
     ]
   ])
 
-  # Eindeutige Teams extrahieren
   unique_teams = distinct([for user in local.all_users : user.team])
 
-  # VM-Anzahl = 1 (eine gemeinsame VM)
+  # One shared VM for all users
   vm_count = 1
 
-  # Liste aller Usernamen und E-Mails
   usernames = [for user in local.all_users : user.username]
   emails    = [for user in local.all_users : user.email]
   user_ids  = [for user in local.all_users : user.id]
 }
 
-# Passwörter für jeden User generieren
 resource "random_password" "user_passwords" {
   count            = length(local.all_users)
   length           = 16
@@ -76,13 +72,13 @@ resource "random_password" "user_passwords" {
   min_special      = 1
 }
 
-# Packer-built image lookup by name (keine IDs hardcoden)
+# Packer-built image lookup by name (avoid hardcoding IDs)
 data "openstack_images_image_v2" "image" {
   name        = var.image_name
   most_recent = true
 }
 
-# External network nur nötig, wenn Floating IP aktiviert ist
+# External network only needed when floating IP is enabled
 data "openstack_networking_network_v2" "external" {
   name = var.floating_ip_pool
 }
@@ -121,21 +117,20 @@ resource "openstack_compute_instance_v2" "shared_vm" {
 }
 
 # -----------------------------------------------------------------------------
-# Optional Floating IP (eine für die gemeinsame VM)
+# Optional Floating IP (one for the shared VM)
 # -----------------------------------------------------------------------------
 resource "openstack_networking_floatingip_v2" "fip" {
   count = local.enable_floating_ip ? 1 : 0
   pool  = data.openstack_networking_network_v2.external.name
 }
 
-# Warten bis VM vollständig gebootet ist
+# Wait for the VM to fully boot before looking up the port
 resource "time_sleep" "wait_for_vm" {
   count           = local.enable_floating_ip ? 1 : 0
   depends_on      = [openstack_compute_instance_v2.shared_vm]
   create_duration = "60s"
 }
 
-# Port-ID der VM finden
 data "openstack_networking_port_v2" "vm_port" {
   count     = local.enable_floating_ip ? 1 : 0
   device_id = openstack_compute_instance_v2.shared_vm.id
@@ -145,7 +140,7 @@ data "openstack_networking_port_v2" "vm_port" {
   ]
 }
 
-# Floating IP Association mit data-basierter Port-ID
+# Floating IP association using the data-source-based port ID
 resource "openstack_networking_floatingip_associate_v2" "fip_assoc" {
   count       = local.enable_floating_ip ? 1 : 0
   floating_ip = openstack_networking_floatingip_v2.fip[0].address
